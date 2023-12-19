@@ -1,5 +1,6 @@
 import wx
 import wxframes
+import btplotview
 from pubsub import pub
 
 
@@ -33,18 +34,20 @@ class Frame(wxframes.BaseFrame):
 
     def setTransactionDetails(self, tdata):
         print('Frame: setTransactionDetails')
+        print(tdata)
         self.fd_datetime.SetValue(tdata[1])
         self.fd_type.SetValue(tdata[2])
+        self.fd_comment.SetValue(tdata[9])
         self.fd_input.SetValue(tdata[3])
         self.fd_inputval.SetValue(formatValue(tdata[4], tdata[5]))
         self.fd_output.SetValue(tdata[6])
         self.fd_outputval.SetValue(formatValue(tdata[7], tdata[8]))
         self.ld_inputval.SetLabelText(tdata[5])
         self.ld_outputval.SetLabelText(tdata[8])
-        self.fd_fee.SetValue(formatValue(tdata[9], tdata[10]))
-        self.ld_fee.SetLabelText(tdata[10])
+        self.fd_fee.SetValue(formatValue(tdata[10], tdata[11]))
+        self.ld_fee.SetLabelText(tdata[11])
         fractionBase = tdata[4] if tdata[5] == 'BTC' else tdata[7]
-        self.ld_fraction.SetLabelText(f'{tdata[9]/fractionBase*100:.1f}%')
+        self.ld_fraction.SetLabelText(f'{tdata[10]/fractionBase*100:.1f}%')
         # set background colors
         if tdata[5] == 'BTC':
             self.fd_inputval.SetBackgroundColour(wx.Colour(254, 234, 214))
@@ -67,16 +70,21 @@ class Frame(wxframes.BaseFrame):
     def onOpenWalletSums(self, event):
         print('onOpenWalletSums')
         sumDialog = WalletSums(self)
-        sumDialog.__int__(self)
         sumDialog.ShowModal()
         print('onOpenWalletSums:end')
+
+    def onOpenPlots(self, event):
+        print('onOpenPlots')
+        plotDialog = btplotview.plotDialog(self)
+        plotDialog.ShowModal()
+        print('onOpenPlots:end')
 
     def closeaction(self, event):
         self.Close(True)
 
 
 class WalletSums(wxframes.sumDialog):
-    def __int__(self, parent):
+    def __init__(self, parent):
         print('WalletSum:init')
         super().__init__(parent)
 

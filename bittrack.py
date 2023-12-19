@@ -1,11 +1,13 @@
 import wx
 import os
+import sys
 import requests
 import json
 from pubsub import pub
-# from pubsub.utils.notification import useNotifyByWriteFile
+from pubsub.utils.notification import useNotifyByWriteFile
 import btmodel
 import btview
+from datetime import date, datetime, timedelta
 
 # useNotifyByWriteFile(sys.stdout)
 
@@ -14,14 +16,16 @@ import btview
 
 # --- Controller -------------------------------------------------------------------------------------------------------
 class AppController:
-    def __int__(self):
+    def __init__(self):
         print('Controller:init')
 
         pub.subscribe(self.selectedChanged, 'msg_selectionChanged')
         pub.subscribe(self.listChanged, 'msg_listChanged')
         pub.subscribe(self.getWalletSums, 'msg_getWalletSums')
+        pub.subscribe(self.getPlotdata, 'msg_getPlotdata')
 
         self.listChanged()
+        self.updateTimetable()
 
     def listChanged(self):
         tlist = app.model.getTransactionList()
@@ -56,6 +60,45 @@ class AppController:
             age = 0
         return rate
 
+    def getPlotdata(self):
+        startdate = '2020-01-01'
+        enddate = '2023-12-31'
+        pdlist = app.model.getPlotdata(startdate, enddate)
+        pub.sendMessage('msg_newPlotdata', pdlist=pdlist)
+
+    def updateTimetable(self):
+        # get last date in timetable and calculation number of new changrates to request
+        ttdatestr, btcsum = app.model.getTimetableLast()
+        ttdate = date.fromisoformat(ttdatestr)
+        newrows = (date.today() - ttdate).days + 1
+        resp_cg = requests.get(f'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=eur&days={newrows}&interval=daily&precision=0')
+        prlist = json.loads(resp_cg.text)['prices']
+        if date.fromtimestamp(prlist[-2][0]/1000) == date.fromtimestamp(prlist[-1][0]/1000):
+            prlist.pop(-1)
+        newtlist = app.model.getNewTransactions(ttdatestr)
+        # print('newtlist:', newtlist)
+        # print('prlist:', prlist)
+        # print(ttdatestr, btcsum)
+        ntlrow = 0
+        updatelist = []
+        for prrow in prlist:
+            # print(datetime.fromtimestamp(prrow[0]/1000), ntlrow)
+            if ntlrow < len(newtlist):
+                if date.fromtimestamp(prrow[0]/1000) == date.fromisoformat(newtlist[ntlrow][0]):
+                    btcsum += newtlist[ntlrow][1]
+                    # print(ntlrow, btcsum, newtlist[ntlrow][1])
+                    ntlrow += 1
+            prrow.append(btcsum)
+            prrow.append(int(round(prrow[1] * btcsum / 1000000, 0)))
+            prrow[0] = str(date.fromtimestamp(prrow[0]/1000))
+            # print(date.fromtimestamp(prrow[0]/1000) == date.fromisoformat(newtlist[ntlrow][0]))
+            # print(datetime.fromtimestamp(prrow[0]/1000), prrow)
+            updatelist.append(tuple(prrow))
+        # print(updatelist)
+        app.model.updateTimetable(updatelist)
+
+
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 class BittrackApp(wx.App):
@@ -85,5 +128,4 @@ class BittrackApp(wx.App):
 if __name__ == '__main__':
     app = BittrackApp()
     c = AppController()
-    c.__int__()
     app.MainLoop()

@@ -1,0 +1,6 @@
+wxPython>=4.2.1
+Pypubsub>=4.0.3
+requests>=2.31.0
+matplotlib>=3.8.2
+numpy>=1.26.2
+wxmplot>=0.9.58
